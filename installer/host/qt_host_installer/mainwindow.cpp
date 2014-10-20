@@ -28,6 +28,9 @@
     #include <sys/mount.h>
     #include <QDir>
 #endif
+#ifdef Q_OS_LINUX
+#include <unistd.h>
+#endif
 
 #define WIDGET_START QPoint(10,110)
 
@@ -338,7 +341,8 @@ void MainWindow::showSuccessDialog()
     Preseeder *ps = new Preseeder();
     if (this->device.allowsPreseedingNFS() || this->device.allowsPreseedingUSB() || this->device.allowsPreseedingSD() || this->device.allowsPreseedingInternal() || this->device.allowsPreseedingPartitioning() || this->device.allowsPreseedingNetwork())
     {
-        ps->setLanguageString(this->localeName);
+        if (!this->localeName.isEmpty())
+            ps->setLanguageString(this->localeName);
         ps->setTargetSettings(this);
         if (this->device.allowsPreseedingNetwork())
         {
@@ -352,8 +356,7 @@ void MainWindow::showSuccessDialog()
 #if defined (Q_OS_MAC) || defined (Q_OS_LINUX)
     QString diskPath;
     #if defined (Q_OS_LINUX)
-        utils::writeLog("Informing the kernel of updated partition table");
-        system("/sbin/partprobe");
+        io::updateKernelTable();
     #endif
     #if defined (Q_OS_LINUX)
         diskPath = nd->getDiskPath() + "1";
@@ -385,6 +388,11 @@ void MainWindow::showSuccessDialog()
         utils::writeLog("Writing the preseeder to filesystem");
         QFile preseedFile(QString(mountDir.absolutePath() + "/preseed.cfg"));
         preseedFile.open(QIODevice::WriteOnly | QIODevice::Text);
+#ifdef Q_OS_LINUX
+        // Set the owner and group the same as the home path
+        QFileInfo info(QDir::homePath());
+        fchown(preseedFile.handle(),info.ownerId(),info.groupId());
+#endif
         QTextStream out(&preseedFile);
         for (int i = 0; i < preseedList.count(); i++)
         {
@@ -392,7 +400,9 @@ void MainWindow::showSuccessDialog()
         }
         preseedFile.close();
     }
-    utils::writeLog("Finished. Unmount in any case...");
+    utils::writeLog("Finished. Syncing...");
+    system("/bin/sync");
+    utils::writeLog("Unmount in any case...");
     io::unmount(diskPath, false);
     utils::writeLog("Final sync.");
 	system("/bin/sync");

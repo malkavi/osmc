@@ -19,9 +19,11 @@ echo Creating tarball
 tar -czf src.tar.gz src/
 rm -rf src/
 popd
-cp ${TARGET}.spec ${OUTPUT}
+cp osmc-installer.spec ${OUTPUT}
 echo Updating RPM versioning
-sed -e s/PLACEHOLDER/${VERSION}/ -i ${OUTPUT}/${TARGET}.spec
+sed -e s/PLACEHOLDER/${VERSION}/ -i ${OUTPUT}/osmc-installer.spec
 echo Updating Debian versioning
-#TBC
+cp debian.changelog debian.control debian.dsc debian.rules ${OUTPUT}
+sed -e s/PLACEHOLDER/${VERSION}/ -i ${OUTPUT}/debian.changelog
+sed -e s/PLACEHOLDER/${VERSION}/ -i ${OUTPUT}/debian.dsc
 echo Files are now ready for OBS
