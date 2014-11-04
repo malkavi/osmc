@@ -5,43 +5,37 @@
 #include <QFontDatabase>
 #include <QGraphicsOpacityEffect>
 #include "sys/mount.h"
-#include <QDebug>
-#include <QFile>
-#include <QDir>
-#include <QProcess>
-#include <QString>
-#include <QStringList>
-#include <QTextStream>
-#include <QThread>
-#include <QTranslator>
-#include <QWSServer>
-#include "extractworker.h"
 #include <QDesktopWidget>
 #include <QApplication>
-
-#ifndef Q_WS_QWS
-#include "filesystem.h"
+#ifdef Q_WS_QWS
+#include <QWSServer>
 #endif
+#include <QFile>
+#include "targetlist.h"
+#include "target.h"
+#include <QTranslator>
+#include <QThread>
+#include "extractworker.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow)
+    ui(new Ui::MainWindow), device(NULL), preseed(NULL)
+
 {
     ui->setupUi(this);
     this->setFixedSize(this->size());
     /* Set up logging */
     logger = new Logger();
     logger->addLine("Starting OSMC installer");
-    #ifndef Q_WS_QWS
-    ui->statusLabel->setText("WORKING IN DUMMY MODE!");
-    #endif
     /* UI set up */
     #ifdef Q_WS_QWS
     QWSServer *server = QWSServer::instance();
     if(server)
+    {
         server->setCursorVisible(false);
         server->setBackground(QBrush(Qt::black));
         this->setWindowFlags(Qt::Tool|Qt::CustomizeWindowHint);
+    }
     #endif
     this->setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, this->size(), qApp->desktop()->availableGeometry()));
     QFontDatabase fontDatabase;
@@ -51,135 +45,49 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->statusLabel->setGraphicsEffect(ope);
     ui->copyrightLabel->setGraphicsEffect(ope);
     ui->statusProgressBar->setGraphicsEffect(ope);
+    /* Populate target list map */
+    targetList = new TargetList();
+    utils = new Utils(logger);
 }
+
 
 void MainWindow::install()
 {
+    qApp->processEvents();
     /* Find out what device we are running on */
     logger->addLine("Detecting device we are running on");
-    dev = utils::getOSMCDev();
-    if (! dev.isEmpty())
-        logger->addLine(tr("Detected Device") + ": " + dev);
-    else
+    device = targetList->getTarget(utils->getOSMCDev());
+    if (device == NULL)
     {
-        logger->addLine("Could not determine device from /proc/cmdline");
         haltInstall("unsupported device"); /* No tr here as not got lang yet */
         return;
     }
-    /* Find partition location */
-    logger->addLine("Trying to find boot partition");
-    QString bootPart;
-    QString bootFs;
-    bool mountRW = false; /* We can't mount ISOs RW */
-    if (dev == "rbp")
+    /* Mount the BOOT filesystem */
+    logger->addLine("Mounting boot filesystem");
+    if (! utils->mountPartition(device, MNT_BOOT))
     {
-        bootPart = "/dev/mmcblk0p1";
-        bootFs = "vfat";
-        mountRW = true;
-        logger->addLine("Boot partition should be at: " + bootPart);
-    }
-    if (bootPart.isEmpty())
-    {
-        logger->addLine("Could not resolve boot partition");
-        haltInstall("cannot work out boot partition");
+        haltInstall("could not mount bootfs");
         return;
     }
-    /* Mount the filesystem */
-    int mountStatus;
-    #ifdef Q_WS_QWS
-    if (mountRW)
-        logger->addLine("Attempting to mount partition: " + bootPart + " " + "as RW");
-    else
-        logger->addLine("Attempting to mount partition: " + bootPart + " " + "as RO");
-    if (bootFs == "vfat")
-        mountStatus = mount(bootPart.toLocal8Bit(), "/mnt", "vfat", 1, "");
-    #else
-    logger->addLine("Fake mounting as we are in Qt Creator");
-    mountStatus = 0;
-    #endif
-    if (mountStatus != 0)
+    /* Sanity check: need filesystem.tar.xz */
+    QFile fileSystem(QString(MNT_BOOT) + "/filesystem.tar.xz");
+    if (! fileSystem.exists())
     {
-        logger->addLine("Mounting failed!");
-        haltInstall("initial mount failed"); /* No tr here as not got lang yet */
+        haltInstall("no filesystem found");
         return;
     }
-    else
-        logger->addLine("Successfully mounted boot partition");
-    /* Check we have a filesystem for target */
-    logger->addLine("Checking for filesystem tarball");
-    #ifdef Q_WS_QWS
-    QFile fsTarball("/mnt/filesystem.tar.xz");
-    if (fsTarball.exists())
-        logger->addLine("Filesystem tarball exists!");
-    else
+    /* Load in preseeded values */
+    preseed = new PreseedParser();
+    if (preseed->isLoaded())
     {
-        logger->addLine("No filesystem tarball was found");
-        haltInstall("No filesystem found!"); /* No tr here as not got lang yet */
-        return;
-    }
-    #else
-    QFile fsTarball(QDir::homePath().append("/filesystem.tar.xz"));
-    logger->addLine("Faking filesystem in /mnt");
-    /* Write a basic filesystem so we have something to play with */
-    QByteArray fsByteArray;
-    QDataStream fsDataStream(&fsByteArray, QIODevice::WriteOnly);
-    fsDataStream.writeRawData((const char*) randomfile_tar_xz, randomfile_tar_xz_len);
-    fsTarball.open(QIODevice::WriteOnly);
-    fsTarball.write(fsByteArray);
-    fsTarball.close();
-    #endif
-
-
-    /* Check for a preseeding file */
-    QStringList preseedStringList;
-    #ifdef Q_WS_QWS
-    logger->addLine("Checking for a preseed file in /mnt");
-    QFile preseedFile("/mnt/preseed.cfg");
-    if (preseedFile.exists())
-    {
-        logger->addLine("Preseed file was found");
-        QTextStream preseedStream(&preseedFile);
-        QString preseedString;
-        while (!preseedStream.atEnd())
+        logger->addLine("Preseed file found, will attempt to parse");
+        /* Locales */
+        locale = preseed->getStringValue("globe/locale");
+        if (! locale.isEmpty())
         {
-            preseedString = preseedStream.readAll();
-        }
-         preseedStringList = preseedString.split(QRegExp("[\r\n]"),QString::SkipEmptyParts);
-    }
-    else
-        logger->addLine("Preseed file does not exist");
-    #else
-    logger->addLine("No preseed file as we are in Qt Creator, faking some preseeding");
-    //preseedStringList.append("...");
-    preseedStringList.append("d-i target/storage string nfs");
-    preseedStringList.append("d-i network/interface string eth");
-    preseedStringList.append("d-i network/auto boolean true");
-
-    #endif
-    /* Check preseeding for our install type */
-    bool useNetwork = false;
-    bool useNFS = false;
-    QString storageTypeString;
-    QString storagePathString;
-    bool useDHCP = true;
-    QString ip;
-    QString subnet;
-    QString gw;
-    QString dns1;
-    QString dns2;
-    for (int i = 0; i < preseedStringList.count(); i++)
-    {
-        QString pString = preseedStringList.at(i);
-        QStringList pStringSplit = pString.split(" ");
-        QString valueString;
-        bool valueisBool;
-        valueisBool = (pStringSplit.at(2) == "boolean") ? true : false;
-        valueString = pStringSplit.at(3);
-        if (pString.contains("globe/locale"))
-        {
-            logger->addLine("Found a definition for globalisation: " + valueString);
+            logger->addLine("Found a definition for globalisation: " + locale);
             QTranslator translator;
-            if (translator.load(qApp->applicationDirPath() + "/osmc_" + valueString + ".qm"))
+            if (translator.load(qApp->applicationDirPath() + "/osmc_" + locale + ".qm"))
             {
                 logger->addLine("Translation loaded successfully!");
                 qApp->installTranslator(&translator);
@@ -188,128 +96,140 @@ void MainWindow::install()
             else
                 logger->addLine("Could not load translation");
         }
-        if (pString.contains("target/storage"))
+        /* Install target */
+        installTarget = preseed->getStringValue("target/storage");
+        if (! installTarget.isEmpty())
         {
-            logger->addLine("Found a definition for storage: " + valueString);
-            storageTypeString = valueString;
-            if (valueString == "nfs")
-                useNetwork = true;
-
-            continue;
+            logger->addLine("Found a definition for storage: " + installTarget);
+            if (installTarget == "nfs")
+            {
+                QString nfsPath = preseed->getStringValue("target/storagePath");
+                if (! nfsPath.isEmpty())
+                {
+                    device->setRoot(nfsPath);
+                    useNFS = true;
+                }
+            }
+            if (installTarget == "usb")
+            {
+                /* Behaviour for handling USB installs */
+                if (utils->getOSMCDev() == "rbp") { device->setRoot("/dev/sda1"); }
+                ui->statusLabel->setText(tr("USB install: 60 seconds to remove device before data loss"));
+                qApp->processEvents();
+                system("/bin/sleep 60");
+            }
         }
-        if (pString.contains("target/storagePath"))
+        /* Bring up network if using NFS */
+        if (useNFS)
         {
-            logger->addLine("Found storage path definition: " + valueString);
-            storagePathString = valueString;
-            continue;
-        }
-        if (pString.contains("network/ip"))
-        {
-            logger->addLine("Found IP address entry");
-            ip = valueString;
-            continue;
-        }
-        if (pString.contains("network/mask"))
-        {
-            logger->addLine("Found netmask address entry");
-            subnet = valueString;
-            continue;
-        }
-        if (pString.contains("network/dns1"))
-        {
-            logger->addLine("Found dns1 address entry");
-            dns1 = valueString;
-            continue;
-        }
-        if (pString.contains("network/dns2"))
-        {
-            logger->addLine("Found dns2 address entry");
-            dns2 = valueString;
-            continue;
-        }
-        if (pString.contains("network/gw"))
-        {
-            logger->addLine("Found gateway address entry");
-            gw = valueString;
-            continue;
+            logger->addLine("NFS installation chosen, must bring up network");
+            nw = new Network();
+            nw->setIP(preseed->getStringValue("network/ip"));
+            nw->setMask(preseed->getStringValue("network/mask"));
+            nw->setGW(preseed->getStringValue("network/gw"));
+            nw->setDNS1(preseed->getStringValue("network/dns1"));
+            nw->setDNS2(preseed->getStringValue("network/dns2"));
+            if (! nw->isDefined())
+            {
+                logger->addLine("Either network preseed definition incomplete, or user wants DHCP");
+                nw->setAuto();
+                logger->addLine("Attempting to bring up eth0");
+                ui->statusLabel->setText(tr("Configuring Network"));
+                nw->bringUp();
+            }
         }
     }
-
-    if (useNetwork)
+    else
     {
-        QStringList *interfacesStringList = new QStringList();
-        interfacesStringList->append(QString("auto eth0"));
-        if (! ip.isEmpty() && ! subnet.isEmpty() && ! gw.isEmpty() && dns1.isEmpty() && dns2.isEmpty())
+        logger->addLine("No preseed file was found");
+    }
+    /* If !nfs, create necessary partitions */
+    ui->statusLabel->setText(tr("Partitioning device"));
+    if (! useNFS)
+    {
+        logger->addLine("Creating root partition");
+        ui->statusLabel->setText(tr("Formatting device"));
+        QString rootBase = device->getRoot();
+        if (rootBase.contains("mmcblk"))
+            rootBase.chop(2);
+        else
+            rootBase.chop(1);
+        logger->addLine("From a root partition of " + device->getRoot() + ", I have deduced a base device of " + rootBase);
+        if (device->hasRootChanged())
         {
-            logger->addLine("All entries for manual IP configuration defined");
-            interfacesStringList->append("iface eth0 inet static");
-            interfacesStringList->append("\t address " + ip);
-            interfacesStringList->append("\t netmask " + subnet);
-            interfacesStringList->append("\t gateway " + gw);
-            QFile nameserversFile("/etc/resolv.conf");
-            nameserversFile.open(QIODevice::WriteOnly, QIODevice::Text);
-            QTextStream nameserversTextStream(&nameserversFile);
-            nameserversTextStream << "nameserver " + dns1;
-            nameserversTextStream << "nameserver " + dns2;
-            nameserversFile.close();
+            logger->addLine("Must mklabel as root fs is on another device");
+            utils->mklabel(rootBase, false);
+            utils->mkpart(rootBase, "ext4", "4096s", "100%");
+            utils->fmtpart(device->getRoot(), "ext4");
         }
         else
         {
-            logger->addLine("No entries defined for manual IP, will use DHCP");
-            interfacesStringList->append(QString("iface eth0 inet dhcp"));
+            int size = utils->getPartSize(rootBase, (device->getBootFS() == "vfat" ? "fat32" : "ext4"));
+            if (size == -1)
+            {
+                logger->addLine("Issue getting size of device");
+                haltInstall(tr("cannot work out partition size"));
+                return;
+            }
+            logger->addLine("Determined " + QString::number(size) + " MB as end of first partition");
+            utils->mkpart(rootBase, "ext4", QString::number(size + 2) + "M", "100%");
+            utils->fmtpart(device->getRoot(), "ext4");
         }
-        logger->addLine("Going to write the following to /etc/network/interfaces");
-        for (int i = 0; i < interfacesStringList->count(); i++)
-        {
-            logger->addLine(interfacesStringList->at(i));
-        }
-        #ifdef Q_WS_QWS
-        QFile interfacesFile("/etc/network/interfaces");
-        interfacesFile.open(QIODevice::WriteOnly | QIODevice::Text);
-        QTextStream interfacesStream(&interfacesFile);
-        for (int i = 0; i < interfacesStringList->count(); i++)
-        {
-            interfacesStream << interfacesStringList->at(i);
-        }
-        interfacesFile.close();
-        #endif
-        #ifdef Q_WS_QWS
-        ui->statusLabel->setText(tr("Starting network"));
-        logger->addLine("Bringing up eth0");
-        QProcess ethProcess;
-        ethProcess.start("ifup");
-        ethProcess.waitForFinished();
-        #endif
-        /* We could add check here: like pinging gateway, but we know soon enough when we try mount */
-        dumpLog();
     }
-
-    //now call the extraction
+    /* Mount root filesystem */
+    if (useNFS)
+        bc = new BootloaderConfig(device, nw, utils, logger);
+    else
+        bc = new BootloaderConfig(device, NULL, utils, logger);
+    logger->addLine("Mounting root");
+    if ( ! utils->mountPartition(device, MNT_ROOT))
+    {
+        logger->addLine("Error occured trying to mount root of " + device->getRoot());
+        haltInstall(tr("can't mount root"));
+        return;
+    }
+   /* Extract root filesystem */
+   ui->statusLabel->setText(tr("Installing files"));
+   logger->addLine("Extracting files to root filesystem");
+   ui->statusProgressBar->setMinimum(0);
+   ui->statusProgressBar->setMaximum(100);
+   QThread* thread = new QThread(this);
+   ExtractWorker *worker = new ExtractWorker(fileSystem.fileName(), MNT_ROOT, logger);
+   worker->moveToThread(thread);
+   connect(thread, SIGNAL(started()), worker, SLOT(extract()));
+   connect(worker, SIGNAL(progressUpdate(unsigned)), this, SLOT(setProgress(unsigned)));
+   connect(worker, SIGNAL(error(QString)), this, SLOT(haltInstall(QString)));
+   connect(worker, SIGNAL(finished()), thread, SLOT(quit()));
+   connect(worker, SIGNAL(finished()), worker, SLOT(deleteLater()));
+   connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+   connect(thread, SIGNAL(finished()), this, SLOT(finished()));
+   thread->start();
 }
 
-void MainWindow::extract()
+void MainWindow::setupBootLoader()
 {
-    /*
-        QString mntPath = "/Users/srm/filesysTest/out";
-
-        ui->statusProgressBar->setMinimum(0);
-        ui->statusProgressBar->setMaximum(100);
-        QThread* thread = new QThread;
-        ExtractWorker *worker = new ExtractWorker(fsTarball.fileName(), mntPath);
-        worker->moveToThread(thread);
-        connect(thread, SIGNAL(started()), worker, SLOT(extract()));
-        connect(worker, SIGNAL(progressUpdate(unsigned)), this, SLOT(setProgress(unsigned)));
-        connect(worker, SIGNAL(error(QString)), this, SLOT(haltInstall(QString)));
-        connect(worker, SIGNAL(finished()), thread, SLOT(quit()));
-        connect(worker, SIGNAL(finished()), worker, SLOT(deleteLater()));
-        connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
-        connect(thread, SIGNAL(finished()), this, SLOT(finished()));
-
-        logger->addLine("Starting extraction of " + fsTarball.fileName() + " to " + mntPath);
-
-        thread->start();*/
+    /* Set up the boot loader */
+    ui->statusProgressBar->setMinimum(0);
+    ui->statusProgressBar->setMaximum(4);
+    ui->statusLabel->setText(tr("Configuring bootloader"));
+    logger->addLine("Configuring bootloader: moving /boot to appropriate boot partition");
+    bc->copyBootFiles();
+    ui->statusProgressBar->setValue(1);
+    logger->addLine("Configuring boot cmdline");
+    bc->configureCmdline();
+    ui->statusProgressBar->setValue(2);
+    logger->addLine("Configuring /etc/fstab");
+    bc->configureFstab();
+    ui->statusProgressBar->setValue(3);
+    /* Dump the log */
+    logger->addLine("Successful installation. Dumping log and rebooting system");
+    dumpLog();
+    ui->statusProgressBar->setValue(4);
+    /* Reboot */
+    ui->statusLabel->setText(tr("Installation successful! Rebooting..."));
+    qApp->processEvents(); /* Force GUI update */
+    utils->rebootSystem();
 }
-
 
 void MainWindow::haltInstall(QString errorMsg)
 {
@@ -322,25 +242,15 @@ void MainWindow::haltInstall(QString errorMsg)
 
 void MainWindow::dumpLog()
 {
-    /* Attempts to write to /mnt; may not *actually* be mounted */
-    /* Could check etc/mtab but it's irrelevant if it is mounted or not */
-    #ifndef Q_WS_QWS
-    QFile logFile("/mnt/install.log");
-    logFile.open(QIODevice::WriteOnly | QIODevice::Text);
-    QTextStream logStream(&logFile);
-    QStringList *logStringList = logger->getLog();
-    for (int i = 0; i < logStringList->count(); i++)
-    {
-        logStream << logStringList->at(i);
-    }
-    logFile.close();
-    #endif
+    QFile logFile("/mnt/boot/install.log");
+    utils->writeToFile(logFile, logger->getLog(), false);
 }
 
 void MainWindow::finished()
 {
-    logger->addLine("Extract finished.");
-
+    logger->addLine("Extraction of root filesystem completed");
+    logger->addLine("Configuring bootloader");
+    setupBootLoader();
 }
 
 void MainWindow::setProgress(unsigned value)
@@ -351,4 +261,10 @@ void MainWindow::setProgress(unsigned value)
 MainWindow::~MainWindow()
 {
     delete ui;
+    delete nw;
+    delete bc;
+    delete device;
+    delete logger;
+    delete this->targetList;
+    delete preseed;
 }

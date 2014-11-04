@@ -7,6 +7,7 @@
 #include "sys/mount.h"
 #include <stdlib.h>
 #include "writeimageworker.h"
+#include <errno.h>
 
 namespace io
 {
@@ -56,6 +57,7 @@ QList<DiskDevice * > enumerateDevice()
 
 bool writeImage(QString devicePath, QString deviceImage, QObject *caller)
 {
+    utils::writeLog("Writing " + deviceImage + " to " + devicePath);
     WriteImageWorker* worker = NULL;
     if(caller) {
         if(! (worker = qobject_cast<WriteImageWorker*>(caller)) ) {
@@ -94,7 +96,13 @@ bool writeImage(QString devicePath, QString deviceImage, QObject *caller)
         }
         r = in.readRawData(buf,sizeof(buf));
     }
+    if(worker){
+        worker->emitFlushingFS();
+    }
     imageFile.close();
+    if(!deviceFile.flush()) {
+        return false;
+    }
     deviceFile.close();
 
     updateKernelTable();
@@ -103,11 +111,12 @@ bool writeImage(QString devicePath, QString deviceImage, QObject *caller)
 
 bool mount(QString diskPath, QString mountDir)
 {
-    return mount(diskPath.toLocal8Bit(), mountDir.toLocal8Bit(), "vfat", 1, "");
+    return mount(diskPath.toLocal8Bit(), mountDir.toLocal8Bit(), "vfat", 0, "") == 0;
 }
 
 bool unmount(QString devicePath, bool isDisk)
 {
+    utils::writeLog("Unmounting " + devicePath);
     /* Read /proc/mounts and find out what partitions of the disk we are using are mounted */
     QFile partitionsFile("/proc/mounts");
     if(!partitionsFile.open(QIODevice::ReadOnly)) {
@@ -127,19 +136,22 @@ bool unmount(QString devicePath, bool isDisk)
         if (line.startsWith(devicePath))
         {
             QStringList devicePartition = line.split(" ");
-            utils::writeLog("Trying to unmount " + devicePartition.at(0));
-            #if defined(Q_OS_LINUX)
-            if (umount(devicePartition.at(0).toLocal8Bit()))
+            utils::writeLog("Trying to unmount " + devicePartition.at(0) + " at " + devicePartition.at(1));
+            int um = umount(devicePartition.at(1).toLocal8Bit());
+            if (um == 0)
             {
                 utils::writeLog("Partition unmounted successfully, continuing!");
             }
-            else
+            else if (um == -1)
             {
-                utils::writeLog("An error occured unmounting the partition");
+                utils::writeLog("An error occured unmounting the partition. ERROR: "+QString::number(errno));
                 ret = false;
             }
-           #endif
-                return false;
+            else
+            {
+                utils::writeLog("An error occured unmounting the partition. retVal: "+QString::number(um));
+                ret = false;
+            }
         }
     }
 
@@ -149,10 +161,8 @@ bool unmount(QString devicePath, bool isDisk)
 
 void updateKernelTable()
 {
-    #if defined(Q_OS_LINUX)
     utils::writeLog("Running partprobe to inform operating system about partition table changes");
     system("/sbin/partprobe");
-    #endif
 }
 
 bool installImagingTool() { return true; }

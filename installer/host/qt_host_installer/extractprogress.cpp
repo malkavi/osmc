@@ -56,10 +56,10 @@ void ExtractProgress::writeImageToDisk()
     /* We don't always have drive letter on Windows, plus, we use ID not disk */
 
 #if defined(Q_OS_WIN) || defined(Q_OS_WIN32)
-   const char *message = tr("Do you want to image the device you selected previously? OSMC is not responsible for loss of personal data").toUtf8().constData();
+   const char *message = tr("Proceed to write OSMC to the device you selected? THIS WILL ERASE THE DEVICE! OSMC is not responsible for loss of personal data").toUtf8().constData();
 #endif
 #if defined (Q_OS_MAC) || defined(Q_OS_LINUX)
-    const char *message = (tr("Do you want to image the device ") + this->devicePath + "?\n" + tr("OSMC is not responsible for loss of personal data")).toUtf8().constData();
+    const char *message = (tr("Proceed to write OSMC to the device you selected ") + this->devicePath + "?\n" + tr("THIS WILL ERASE THE DEVICE!") + "\n" + tr("OSMC is not responsible for loss of personal data")).toUtf8().constData();
 #endif
     if (utils::promptYesNo(tr("Are you sure"), tr(message)))
     {
@@ -73,7 +73,7 @@ void ExtractProgress::writeImageToDisk()
             return;
         }
 #if defined (Q_OS_MAC) || defined(Q_OS_LINUX)
-        ui->extractDetailsLabel->setText(tr("Writing image to ") + this->devicePath + tr("\n(This might take a few minutes!)") + tr("\n(please be patient.)"));
+        ui->extractDetailsLabel->setText(tr("Writing image to ") + this->devicePath + "\n" + tr("Please be patient"));
 #endif
 #if defined (Q_OS_WIN) || defined (Q_OS_WIN32)
         ui->extractDetailsLabel->setText(tr(("Writing image to your device")));
@@ -90,6 +90,7 @@ void ExtractProgress::writeImageToDisk()
         worker->moveToThread(thread);
         connect(worker, SIGNAL(error()), this, SLOT(writeError()));
         connect(thread, SIGNAL(started()), worker, SLOT(process()));
+        connect(worker, SIGNAL(flushingFS()), this, SLOT(setFlushing()));
         connect(worker, SIGNAL(progressUpdate(unsigned)), this, SLOT(setProgress(unsigned)));
         connect(worker, SIGNAL(finished()), thread, SLOT(quit()));
         connect(worker, SIGNAL(finished()), worker, SLOT(deleteLater()));
@@ -174,6 +175,14 @@ void ExtractProgress::writeFinished()
 {
     utils::writeLog("Image successfully written to device");
     emit(finishedExtraction());
+}
+
+void ExtractProgress::setFlushing()
+{
+    ui->extractProgressBar->setMinimum(0);
+    ui->extractProgressBar->setMaximum(0);
+    ui->extractDetailsLabel_2->setText("");
+    ui->extractDetailsLabel->setText(tr("Finalising") + " " + this->devicePath + tr("\n(This might take a minute or two!)"));
 }
 
 ExtractProgress::~ExtractProgress()

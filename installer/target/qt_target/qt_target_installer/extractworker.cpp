@@ -1,49 +1,49 @@
 #include <QFile>
 #include <QTextStream>
+#include <QString>
 #include "extractworker.h"
 
-QProcess *process = NULL;
-
-ExtractWorker::ExtractWorker(QString sourcename, QString targetname)
+ExtractWorker::ExtractWorker(QString sourcename, QString targetname, Logger *logger, QObject* parent):
+    QObject(parent)
 {
     this->sourceName = QString(sourcename);
     this->destName = QString(targetname);
-
+    this->logger = logger;
 }
 
 void ExtractWorker::extract()
 {
+    logger->addLine("Starting extract progress...");
     process = new QProcess();
-    connect(process, SIGNAL(readyRead()), this, SLOT(readFromProcess()));
-    process->setProcessChannelMode(QProcess::MergedChannels);
-    process->start("/bin/sh -c \"pv -n " + sourceName + " | tar xJf - -C " + destName);
-
+    connect(process, SIGNAL(readyReadStandardOutput()), this, SLOT(readFromStdOut()));
+    connect(process, SIGNAL(readyReadStandardError()), this, SLOT(readFromStdErr()));
+    process->start("/bin/sh -c \"/usr/bin/pv -n " + sourceName + " | tar xJf - -C " + destName + "\"");
     process->waitForFinished(-1);
-
-    #ifdef QT_DEBUG
-    qDebug() << "exitCodePv: " << process->exitCode();
-    qDebug() << process->readAllStandardError();
-    qDebug() << process->readAllStandardOutput();
-    #endif
-    emit finished();
-}
-
-void ExtractWorker::readFromProcess()
-{
-    QString value = process->readAllStandardOutput();
-    QString errorString = process->readAllStandardError();
-    #ifdef QT_DEBUG
-    qDebug() << "signal to read value";
-    qDebug() << "readAll: " << value;
-    qDebug() << "assuming intvalue: " << value.toInt();
-    qDebug() << "assuming longvalue: " << value.toLong();
-    qDebug() << "standartOut: " << process->readAllStandardOutput();
-    #endif
-    if (errorString.size() > 0)
+    if (process->exitCode() != 0)
     {
-        emit error(errorString);
+        emit error("Extraction failed. Error: " + QString(process->readAllStandardError()));
         return;
     }
+    else
+        emit finished();
+}
 
+void ExtractWorker::readFromStdOut()
+{
+    QString value = process->readAllStandardOutput();
     emit progressUpdate(value.toInt());
+}
+
+void ExtractWorker::readFromStdErr()
+{
+    QString value = process->readAllStandardError();
+    value = value.split("\n").at(0);
+
+    bool ok;
+    int i_value = value.toInt(&ok);
+    if (ok)
+        emit progressUpdate(i_value);
+    else
+        emit error(value);
+
 }

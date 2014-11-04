@@ -1,11 +1,15 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
-
 #include <QMainWindow>
 #include "logger.h"
 #include "utils.h"
 #include <QString>
 #include <QProcess>
+#include "targetlist.h"
+#include "target.h"
+#include "preseedparser.h"
+#include "network.h"
+#include "bootloaderconfig.h"
 
 namespace Ui {
 class MainWindow;
@@ -22,14 +26,24 @@ public:
 
 public slots:
     void install();
+    void setupBootLoader();
     void setProgress(unsigned value);
     void haltInstall(QString errorMsg);
     void finished();
 
 private:
+    void extract();
+
     Ui::MainWindow *ui;
     Logger *logger;
-    QString dev;
-    void extract();
+    TargetList *targetList;
+    Target *device;
+    Utils *utils;
+    PreseedParser *preseed;
+    QString installTarget;
+    QString locale;
+    bool useNFS = false;
+    Network *nw;
+    BootloaderConfig *bc;
 };
 #endif
