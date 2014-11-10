@@ -1,9 +1,0 @@
-Origin: OSMC
-Package: osmc-appletv-remote
-Version: 1.0
-Section: tools
-Essential: No
-Priority: optional
-Architecture: i386
-Maintainer: Sam G Nazarko <email@samnazarko.co.uk>
-Description: atvclient for 1st Generation Apple TV

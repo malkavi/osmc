@@ -6,7 +6,7 @@
 . ../../scripts/common.sh
 
 INIT_PKGS="systemd systemd-sysv"
-SYSTEM_PKGS="base-files perftune-osmc sysctl-osmc ftr-osmc diskmount-osmc apt-utils openssh-server sudo module-init-tools connman net-tools ntp locales"
+SYSTEM_PKGS="base-files-osmc perftune-osmc sysctl-osmc ftr-osmc diskmount-osmc apt-utils ssh-app-osmc sudo module-init-tools connman net-tools ntp locales dialog console-setup wget nano"
 CHROOT_PKGS="${INIT_PKGS} ${SYSTEM_PKGS}"
 
 function setup_osmc_user()
@@ -68,7 +68,7 @@ function create_fs_tarball()
 {
 	echo -e "Creating filesystem tarball"
 	pushd ${1}
-	tar -cf - * | xz -9 -c - > ../${2}.tar.xz 
+	tar -cf - * | xz -9 -c - > ../${2}-$(date +%Y%m%d).tar.xz 
 	popd
 	rm -rf ${1}
 }

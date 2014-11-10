@@ -102,7 +102,6 @@ function cleanup_filesystem()
 	echo -e "Cleaning up filesystem"
 	rm -f ${1}/etc/resolv.conf
 	rm -f ${1}/etc/network/interfaces
-	rm -rf ${1}/usr/share/doc/*
 	rm -rf ${1}/usr/share/man/* 
 	rm -rf ${1}/var/cache/apt/archives/*
 }
@@ -111,6 +110,68 @@ function remove_existing_filesystem()
 {
 	if [ -f "$1" ]; then echo -e "Removing old filesystem" && rm -rf "$1"; fi
 }
+
+function install_patch()
+{
+	patches=$(find ${1} -name "${2}-*.patch" -printf '%P\n')
+	for patch in $patches
+	do
+		cp ${1}/$patch .
+		echo Applying patch $patch
+		patch -p1 < $patch
+		rm $patch
+	done
+}
+
+function pull_source()
+{
+	if ! which unzip >/dev/null 2>&1; then echo -e "Installing unzip" && update_sources && verify_action && install_package "unzip" && verify_action; fi
+	if ! which git >/dev/null 2>&1; then echo -e "Installing Git" && update_sources && verify_action && install_package "git" && verify_action; fi
+	if ! which svn >/dev/null 2>&1; then echo -e "Installing Subversion" && update_sources && verify_action && install_package "subversion" && verify_action; fi
+	if [ -d ${2} ]
+	then 
+		if [ "$2" != "." ]
+		then
+			echo "Cleaning old source" && rm -rf ${2}; fi
+		fi
+	if [[ $1 =~ \.zip$ ]]
+	then
+	echo -e "Detected ZIP source"
+	if [ "$2" != "." ]; then mkdir ${2}; fi
+	wget ${1} -O source.zip
+	if [ $? != 0 ]; then echo "Downloading zip failed" && exit 1; fi
+	unzip source.zip -d ${2}
+	rm source.zip
+	return
+	fi
+
+	if [[ $1 =~ \.tar$ || $1 =~ \.tgz$ || $1 =~ \.tar\.gz$ || $1 =~ \.tar\.bz2$ ]]
+	then
+	echo -e "Detected tarball source"
+	if [ "$2" != "." ]; then mkdir ${2}; fi
+	wget ${1} -O source.tar
+	if [ $? != 0 ]; then echo "Downloading tarball failed" && exit 1; fi
+	tar -xvf source.tar -C ${2}
+	rm source.tar
+	return
+	fi
+
+	if [[ $1 =~ git ]]
+	then
+	echo -e "Detected Git source"
+	git clone ${1} ${2}
+	if [ $? != 0 ]; then echo "Source checkout failed" && exit 1; fi
+	return
+	fi
+
+	echo -e "No file type match found for URL"
+}
+
+DOWNLOAD_URL=$(env LANG=C wget -S --spider --timeout 60 http://download.osmc.tv 2>&1 > /dev/null | grep "^Location:" | cut -f 2 -d ' ')
+export DOWNLOAD_URL
+
+cores=$(if [ ! -f /proc/cpuinfo ]; then mount -t proc proc /proc; fi; cat /proc/cpuinfo | grep processor | wc -l && umount /proc/ >/dev/null 2>&1)
+export BUILD="make -j${cores}"
 
 export -f check_platform
 export -f verify_action
@@ -123,3 +184,5 @@ export -f install_package
 export -f fetch_filesystem
 export -f cleanup_filesystem
 export -f remove_existing_filesystem
+export -f install_patch
+export -f pull_source

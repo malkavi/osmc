@@ -13,16 +13,15 @@ verify_action
 update_sources
 verify_action
 
-set_lb
-set_publish
-
 # Install packages needed to build filesystem for building
-install_package "debootstrap"
-verify_action
-install_package "dh-make"
-verify_action
-install_package "devscripts"
-verify_action
+packages="debootstrap
+dh-make
+devscripts"
+for package in $packages
+do
+	install_package $package
+	verify_action
+done
 
 # Configure the target directory
 
@@ -67,24 +66,9 @@ verify_action
 echo -e "Updating sources"
 chroot ${DIR} apt-get update
 verify_action
-if [ -z $DISABLE_LOCAL_BUILDS ]
-then
-echo -e "Installing default chroot packages"
-chroot ${DIR} apt-get -y install --no-install-recommends $CHROOT_PKGS $XBMC_MAN_PKGS
-verify_action
-else
-echo -e "Installing default chroot packages without downstream"
+echo -e "Installing packages"
 chroot ${DIR} apt-get -y install --no-install-recommends $CHROOT_PKGS
 verify_action
-fi
-if [ -z $DISABLE_LOCAL_BUILDS ]
-then
-echo -e "Installing target specific packages"
-chroot ${DIR} apt-get -y install --no-install-recommends $LOCAL_CHROOT_PKGS
-verify_action
-else
-echo -e "Told not to install target specific packages"
-fi
 echo -e "Configuring ccache"
 configure_ccache "${DIR}"
 verify_action
@@ -92,6 +76,7 @@ verify_action
 # Perform filesystem cleanup
 chroot ${DIR} umount /proc
 cleanup_filesystem "${DIR}"
+cleanup_buildcache "${DIR}"
 
 # Build Debian package
 echo "Building Debian package"

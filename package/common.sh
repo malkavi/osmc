@@ -3,6 +3,8 @@
 
 #!/bin/bash
 
+. ../scripts/common.sh
+
 function fix_arch_ctl()
 {
 	sed '/Architecture/d' -i $1
@@ -26,46 +28,27 @@ function strip_libs()
 	strip "*.a" > /dev/null 2>&1
 }
 
-function pull_source()
+function handle_dep()
 {
-	if [ -d ${2} ]; then echo "Cleaning old source" && rm -rf ${2}; fi
-
-	if [[ $1 =~ \.zip$ ]]
+	# Used by packages that need other packages to be built first
+	# Check dpkg -l for the existence of the package, try install, otherwise bail. 
+	packages=$(dpkg -l)
+	if ! echo $packages | grep -q ${1}
 	then
-	echo -e "Detected ZIP source"
-	mkdir ${2}
-	wget ${1} -O source.zip
-	if [ $? != 0 ]; then echo "Downloading zip failed" && exit 1; fi
-	unzip source.zip -d ${2}
-	rm source.zip
-	return
+		echo -e "Package ${1} is not found on the system, checking APT"
+		if ! apt-cache search ${1} > /dev/null 2>&1
+		then
+			echo -e "Can't find the package in APT repo. It needs to be built first or you need to wait for upstream to add it"
+		else
+			echo -e "Found in APT and will install"
+			install_package ${1}
+		fi
+	else
+		echo -e "Package ${1} is already installed in the environment"
 	fi
-
-	if [[ $1 =~ \.tar$ || $1 =~ \.tgz$ || $1 =~ \.tar\.gz$ || $1 =~ \.tar\.bz2$ ]]
-	then
-	echo -e "Detected tarball source"
-	mkdir ${2}
-	wget ${1} -O source.tar
-	if [ $? != 0 ]; then echo "Downloading tarball failed" && exit 1; fi
-	tar -xvf source.tar -C ${2}
-	rm source.tar
-	return
-	fi
-
-	if [[ $1 =~ git ]]
-	then
-	echo -e "Detected Git source"
-	git clone ${1} ${2}
-	if [ $? != 0 ]; then echo "Source checkout failed" && exit 1; fi
-	return
-	fi
-
-	echo -e "No file type match found for URL"
 }
-
-cores=$(if [ ! -f /proc/cpuinfo ]; then mount -t proc proc /proc; fi; cat /proc/cpuinfo | grep processor | wc -l)
-export BUILD="make -j${cores}"
 
 export -f fix_arch_ctl
 export -f strip_files
 export -f strip_libs
+export -f handle_dep

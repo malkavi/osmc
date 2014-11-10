@@ -13,17 +13,18 @@ verify_action
 update_sources
 verify_action
 
-set_lb
-set_publish
-
 # Install packages needed to build filesystem for building
-install_package "debootstrap"
-verify_action
-install_package "dh-make"
-verify_action
-install_package "devscripts"
-verify_action
-install_package "qemu binfmt-support qemu-user-static"
+packages="debootstrap
+dh-make
+devscripts
+qemu
+binfmt-support
+qemu-user-static"
+for package in $packages
+do
+	install_package $package
+	verify_action
+done
 
 # Configure the target directory
 ARCH="armhf"
@@ -64,36 +65,20 @@ verify_action
 echo -e "Updating sources"
 chroot ${DIR} apt-get update
 verify_action
-if [ -z $DISABLE_LOCAL_BUILDS ]
-then
-echo -e "Installing default chroot packages"
+echo -e "Installing packages"
 chroot ${DIR} apt-get -y install --no-install-recommends $CHROOT_PKGS
 verify_action
-handle_ds_deps "$DIR" "$XBMC_MAN_PKGS_RBP" "(echo $tcstub | cut -d - -f2)"
-verify_action
-else
-echo -e "Installing default chroot packages without downstream"
-chroot ${DIR} apt-get -y install --no-install-recommends $CHROOT_PKGS
-verify_action
-fi
-if [ -z $DISABLE_LOCAL_BUILDS ]
-then
-echo -e "Installing target specific packages"
-chroot ${DIR} apt-get -y install --no-install-recommends $LOCAL_CHROOT_PKGS
-verify_action
-else
-echo -e "Told not to install target specific packages"
-fi
 echo -e "Configuring ccache"
 configure_ccache "${DIR}"
 verify_action
 
 # Remove QEMU binary
-chroot ${DIR} umount /proc
 remove_emulate_arm "${DIR}"
 
 # Perform filesystem cleanup
+chroot ${DIR} umount /proc
 cleanup_filesystem "${DIR}"
+cleanup_buildcache "${DIR}"
 
 # Build Debian package
 echo "Building Debian package"

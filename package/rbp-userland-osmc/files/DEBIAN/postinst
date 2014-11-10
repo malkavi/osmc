@@ -1,0 +1,2 @@
+#!/bin/bash
+chmod +x /etc/profile.d/videocore.sh

@@ -1,9 +1,0 @@
-Origin: OSMC
-Package: base-files
-Version: 9.0.5
-Section: main
-Essential: Yes
-Priority: required
-Architecture: all
-Maintainer: Sam G Nazarko <email@samnazarko.co.uk>
-Description: modified base-files for OSMC system
