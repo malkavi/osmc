@@ -161,8 +161,9 @@ bool unmount(QString devicePath, bool isDisk)
 
 void updateKernelTable()
 {
+    string partprobepath = system("which partprobe");
     utils::writeLog("Running partprobe to inform operating system about partition table changes");
-    system("/sbin/partprobe");
+    system(partprobepath);
 }
 
 bool installImagingTool() { return true; }
