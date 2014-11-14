@@ -164,7 +164,7 @@ void updateKernelTable()
 {
     std::string partprobepath = system("which partprobe");
     utils::writeLog("Running partprobe to inform operating system about partition table changes");
-    system(partprobepath);
+    system(partprobepath.c_str());
 }
 
 bool installImagingTool() { return true; }
