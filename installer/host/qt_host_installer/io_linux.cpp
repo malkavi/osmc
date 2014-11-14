@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include "writeimageworker.h"
 #include <errno.h>
+#include <string>
 
 namespace io
 {
@@ -161,7 +162,7 @@ bool unmount(QString devicePath, bool isDisk)
 
 void updateKernelTable()
 {
-    string partprobepath = system("which partprobe");
+    std::string partprobepath = system("which partprobe");
     utils::writeLog("Running partprobe to inform operating system about partition table changes");
     system(partprobepath);
 }
