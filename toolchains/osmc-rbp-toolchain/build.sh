@@ -7,6 +7,8 @@
 wd=$(pwd)
 tcstub="osmc-rbp-toolchain"
 
+make clean
+
 check_platform
 verify_action
 
@@ -38,7 +40,7 @@ verify_action
 mkdir -p $DIR
 
 # Debootstrap (foreign)
-fetch_filesystem "--no-check-gpg --arch=${ARCH} --foreign ${RLS} ${DIR} ${URL}"
+fetch_filesystem "--no-check-gpg --arch=${ARCH} --foreign --variant=minbase ${RLS} ${DIR} ${URL}"
 verify_action
 
 # Configure filesystem (2nd stage)
@@ -58,7 +60,7 @@ deb http://apt.osmc.tv jessie main
 
 # Performing chroot operation
 chroot ${DIR} mount -t proc proc /proc
-LOCAL_CHROOT_PKGS="rpiuserland-dev"
+LOCAL_CHROOT_PKGS="rbp-userland-dev-osmc"
 add_apt_key "${DIR}" "http://apt.osmc.tv/apt.key"
 add_apt_key "${DIR}" "http://archive.raspbian.org/raspbian.public.key"
 verify_action
@@ -73,10 +75,10 @@ configure_ccache "${DIR}"
 verify_action
 
 # Remove QEMU binary
+chroot ${DIR} umount /proc
 remove_emulate_arm "${DIR}"
 
 # Perform filesystem cleanup
-chroot ${DIR} umount /proc
 cleanup_filesystem "${DIR}"
 cleanup_buildcache "${DIR}"
 

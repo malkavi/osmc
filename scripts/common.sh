@@ -104,6 +104,7 @@ function cleanup_filesystem()
 	rm -f ${1}/etc/network/interfaces
 	rm -rf ${1}/usr/share/man/* 
 	rm -rf ${1}/var/cache/apt/archives/*
+	rm -f ${1}/var/log/*.log
 }
 
 function remove_existing_filesystem()
@@ -125,9 +126,10 @@ function install_patch()
 
 function pull_source()
 {
-	if ! which unzip >/dev/null 2>&1; then echo -e "Installing unzip" && update_sources && verify_action && install_package "unzip" && verify_action; fi
-	if ! which git >/dev/null 2>&1; then echo -e "Installing Git" && update_sources && verify_action && install_package "git" && verify_action; fi
-	if ! which svn >/dev/null 2>&1; then echo -e "Installing Subversion" && update_sources && verify_action && install_package "subversion" && verify_action; fi
+	if ! command -v unzip >/dev/null 2>&1; then echo -e "Installing unzip" && update_sources && verify_action && install_package "unzip" && verify_action; fi
+	if ! command -v git >/dev/null 2>&1; then echo -e "Installing Git" && update_sources && verify_action && install_package "git" && verify_action; fi
+	if ! command -v svn >/dev/null 2>&1; then echo -e "Installing Subversion" && update_sources && verify_action && install_package "subversion" && verify_action; fi
+	if ! command -v wget >/dev/null 2>&1; then echo -e "Installing wget" && update_sources && verify_action && install_package "wget" && verify_action; fi
 	if [ -d ${2} ]
 	then 
 		if [ "$2" != "." ]

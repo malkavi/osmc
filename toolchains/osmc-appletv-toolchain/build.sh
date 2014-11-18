@@ -7,6 +7,8 @@
 wd=$(pwd)
 tcstub="osmc-appletv-toolchain"
 
+make clean
+
 check_platform
 verify_action
 
@@ -37,7 +39,7 @@ mkdir -p $DIR
 
 # Debootstrap (foreign)
 
-fetch_filesystem "--arch=${ARCH} --foreign ${RLS} ${DIR}"
+fetch_filesystem "--arch=${ARCH} --foreign --variant=minbase ${RLS} ${DIR}"
 verify_action
 
 # Configure filesystem (2nd stage)
@@ -60,7 +62,7 @@ deb http://apt.osmc.tv jessie main
 
 # Performing chroot operation
 chroot ${DIR} mount -t proc proc /proc
-LOCAL_CHROOT_PKGS="osmc-appletv-darwinx libcrystalhd-dev"
+LOCAL_CHROOT_PKGS="appletv-darwinx-osmc libcrystalhd-dev"
 add_apt_key "${DIR}" "http://apt.osmc.tv/apt.key"
 verify_action
 echo -e "Updating sources"

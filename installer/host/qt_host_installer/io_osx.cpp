@@ -15,6 +15,7 @@ namespace io
        utils::writeLog("Enumerating imageable devices for OSX");
        QProcess process;
        QStringList lines;
+       process.setEnvironment(QStringList() << "LANG=C");
        process.start("/usr/sbin/diskutil", QStringList() << "list", QIODevice::ReadWrite | QIODevice::Text);
        if (! process.waitForFinished())
            utils::writeLog("Could not execute diskutil to enumerate devices");
@@ -68,9 +69,11 @@ namespace io
                }
 
                deviceSpace.remove("*");
-
-               DiskDevice *nd = new DiskDevice(i, devicePath, deviceSpace);
-               devices.append(nd);
+               if ( ! (devicePath == "/dev/disk0" || devicePath == "/dev/rdisk0"))
+               {
+                   DiskDevice *nd = new DiskDevice(i, devicePath, deviceSpace);
+                   devices.append(nd);
+               }
            }
        }
        return devices;
@@ -85,6 +88,7 @@ namespace io
        processArguments << "-l" << "AppleScript";
 
        QProcess p;
+       p.setEnvironment(QStringList() << "LANG=C");
        p.start(osascript);
        p.waitForStarted();
        p.write(aScript.toUtf8());
