@@ -20,7 +20,9 @@ ExtractProgress::ExtractProgress(QWidget *parent, QString devicePath, QString de
     ui->extractProgressBar->setMinimum(0);
 
     this->devicePath = QString(devicePath);
-    this->deviceImage = QString(deviceImage);
+
+    /* Windows appends file:// */
+    this->deviceImage = QString(deviceImage).remove("file:///");
 
 }
 
@@ -56,12 +58,12 @@ void ExtractProgress::writeImageToDisk()
     /* We don't always have drive letter on Windows, plus, we use ID not disk */
 
 #if defined(Q_OS_WIN) || defined(Q_OS_WIN32)
-   const char *message = (tr("Are you sure you want to install OSMC on the device you selected?") + "\n" + tr("OSMC is not responsible for loss of personal data")).toUtf8().constData();
+    QString message = tr("Are you sure you want to install OSMC on the device you selected?") + "\n" + tr("OSMC is not responsible for loss of personal data");
 #endif
 #if defined (Q_OS_MAC) || defined(Q_OS_LINUX)
-    const char *message = (tr("Are you sure you want to install OSMC on ") + this->devicePath + "?\n" + tr("OSMC is not responsible for loss of personal data")).toUtf8().constData();
+    QString message = tr("Are you sure you want to install OSMC on ") + this->devicePath + "?\n" + tr("OSMC is not responsible for loss of personal data");
 #endif
-    if (utils::promptYesNo(tr("Are you sure"), tr(message)))
+    if (utils::promptYesNo(tr("Are you sure"), message))
     {
         utils::writeLog("User confirmed");
         bool unmountSuccess = unmountDisk();
@@ -174,11 +176,12 @@ void ExtractProgress::finished()
 void ExtractProgress::writeFinished()
 {
     utils::writeLog("Image successfully written to device");
-    emit(finishedExtraction());
     utils::writeLog("Deleting the uncompressed image to save space");
     QFile uncompressedFile(QString(deviceImage).remove(".gz"));
     if (uncompressedFile.exists())
         uncompressedFile.remove();
+
+    emit(finishedExtraction());
 }
 
 void ExtractProgress::setFlushing()

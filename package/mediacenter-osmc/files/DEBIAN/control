@@ -1,7 +1,9 @@
 Origin: OSMC
-Version: 14.0.0
+Version: 13.9.97
 Section: multimedia
 Essential: No
 Priority: optional
+Provides: xbmc, kodi
 Maintainer: Sam G Nazarko <email@samnazarko.co.uk>
 Description: Media Center package for OSMC
+Package: rbp-mediacenter-osmc

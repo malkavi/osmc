@@ -3,7 +3,12 @@
 # (c) 2014 Sam Nazarko
 # email@samnazarko.co.uk
 curgov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
-test "$curgov" != "performance" && echo "ondemand" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1 && echo 50 > /sys/devices/system/cpu/cpufreq/ondemand/up_threshold
+if [ ! -f /safe_mode ]
+then
+    test "$curgov" != "performance" && echo "ondemand" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1 && echo 50 > /sys/devices/system/cpu/cpufreq/ondemand/up_threshold
+else
+    echo "powersave" | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+fi
 ISHDD=1
 ROOT=$(cat /proc/cmdline)
 ROOT="${ROOT##*root=}"
@@ -32,8 +37,8 @@ then
       NFS_ROOT=$(grep root=/dev/nfs /proc/cmdline)
       if [ "$NFS_ROOT" != "" ]
       then
-		losetup /dev/loop0 /swap
-		mkswap /dev/loop0
+	losetup /dev/loop0 /swap
+	mkswap /dev/loop0
         swapon /dev/loop0
     else
         swapon /swap

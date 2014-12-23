@@ -21,7 +21,7 @@ html, body, button, input, select, textarea, .pure-g-r [class*="pure-u"] {
 @maincolor: @dark;
 @white: #F0F0F0;
 @lgrey: #D3D3D3;
-@link: #789;
+@link: #51bc9b;
 @back: @white;
 @dark: #17394A;
 @dark-trans: rgba(23, 57, 74, 0.9);
@@ -122,7 +122,7 @@ table {
 	a:visited,
 	a:active,
 	a {
-		color: @link;
+		color: @dark;
 		text-decoration: none;
 		border-bottom: none;
     font-weight: 300;
@@ -440,6 +440,48 @@ nav {
     }
   }
 }
+
+// COMMENTS //
+
+.comments-area {
+  font-size: 90%;
+  width: 90%;
+  
+  .comments-title {
+    font-weight: 400;
+  }
+  ol, ul {
+    padding: 0 0em;
+    list-style: none;
+  }
+  
+  .comment-body {
+    background-color: @lgrey;
+    padding: 1em;
+    margin: 0 0 1em;
+    
+    .comment-meta {
+      img {
+        display: none;
+      }
+      .fn {
+        font-size: 110%;
+      }
+      .says {
+        display: none;
+      }
+      .comment-metadata {
+        font-size: 90%;
+      }
+    }
+    .comment-content {
+      p {
+        line-height: 1.2em;
+      }
+    }
+  }
+}
+
 // FOOTER //
 
 // Animate.css //

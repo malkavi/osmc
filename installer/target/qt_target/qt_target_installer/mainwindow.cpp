@@ -23,7 +23,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 {
     ui->setupUi(this);
-    this->setFixedSize(this->size());
+    this->setFixedSize(QApplication::desktop()->size());
     /* Set up logging */
     logger = new Logger();
     logger->addLine("Starting OSMC installer");
@@ -216,10 +216,10 @@ void MainWindow::setupBootLoader()
     bc->copyBootFiles();
     ui->statusProgressBar->setValue(1);
     logger->addLine("Configuring boot cmdline");
-    bc->configureCmdline();
+    bc->configureEnvironment();
     ui->statusProgressBar->setValue(2);
     logger->addLine("Configuring /etc/fstab");
-    bc->configureFstab();
+    bc->configureMounts();
     ui->statusProgressBar->setValue(3);
     /* Dump the log */
     logger->addLine("Successful installation. Dumping log and rebooting system");

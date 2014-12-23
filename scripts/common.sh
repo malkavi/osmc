@@ -60,12 +60,12 @@ function install_package()
 {
 	echo -e "Installing package ${1}..."
 	# Check if our package is installed
-	dpkg --status $1 > /dev/null 2>&1
+	dpkg -s $1 > /dev/null 2>&1 # Although this may seem duplicated in handle_dep. handle_dep is used for packages only, where as installers/ and other parts will call this function directly. handle_dep purely exists to tell us when we need to build first or add an apt repo.
 	if [ $? == 0 ]
 	then
 	echo -e "Package already installed."
 	else
-		apt-get -y install $1 > /dev/null 2>&1
+		apt-get -y install $1
 		if [ $? != 0 ]; then echo -e "Failed to install" && return 1; else echo -e "Package installed successfully" && return 0; fi
 	fi
 }
@@ -104,6 +104,7 @@ function cleanup_filesystem()
 	rm -f ${1}/etc/network/interfaces
 	rm -rf ${1}/usr/share/man/* 
 	rm -rf ${1}/var/cache/apt/archives/*
+	rm -rf ${1}/var/lib/apt/lists/*
 	rm -f ${1}/var/log/*.log
 }
 
@@ -114,7 +115,7 @@ function remove_existing_filesystem()
 
 function install_patch()
 {
-	patches=$(find ${1} -name "${2}-*.patch" -printf '%P\n')
+	patches=$(find ${1} -name "${2}-*.patch" -printf '%P\n' | sort)
 	for patch in $patches
 	do
 		cp ${1}/$patch .
@@ -126,10 +127,12 @@ function install_patch()
 
 function pull_source()
 {
-	if ! command -v unzip >/dev/null 2>&1; then echo -e "Installing unzip" && update_sources && verify_action && install_package "unzip" && verify_action; fi
-	if ! command -v git >/dev/null 2>&1; then echo -e "Installing Git" && update_sources && verify_action && install_package "git" && verify_action; fi
-	if ! command -v svn >/dev/null 2>&1; then echo -e "Installing Subversion" && update_sources && verify_action && install_package "subversion" && verify_action; fi
-	if ! command -v wget >/dev/null 2>&1; then echo -e "Installing wget" && update_sources && verify_action && install_package "wget" && verify_action; fi
+	ischroot
+	if [ $? == 2 ]; then return; fi # Prevent recursive loop
+	if ! command -v unzip >/dev/null 2>&1; then update_sources && verify_action && install_package "unzip" && verify_action; fi
+	if ! command -v git >/dev/null 2>&1; then update_sources && verify_action && install_package "git" && verify_action; fi
+	if ! command -v svn >/dev/null 2>&1; then update_sources && verify_action && install_package "subversion" && verify_action; fi
+	if ! command -v wget >/dev/null 2>&1; then update_sources && verify_action && install_package "wget" && verify_action; fi
 	if [ -d ${2} ]
 	then 
 		if [ "$2" != "." ]
@@ -147,7 +150,7 @@ function pull_source()
 	return
 	fi
 
-	if [[ $1 =~ \.tar$ || $1 =~ \.tgz$ || $1 =~ \.tar\.gz$ || $1 =~ \.tar\.bz2$ ]]
+	if [[ $1 =~ \.tar$ || $1 =~ \.tgz$ || $1 =~ \.tar\.gz$ || $1 =~ \.tar\.bz2$ || $1 =~ \.tar\.xz$ ]]
 	then
 	echo -e "Detected tarball source"
 	if [ "$2" != "." ]; then mkdir ${2}; fi
@@ -166,11 +169,14 @@ function pull_source()
 	return
 	fi
 
-	echo -e "No file type match found for URL"
+	echo -e "No file type match found for URL" && exit 1
 }
 
-DOWNLOAD_URL=$(env LANG=C wget -S --spider --timeout 60 http://download.osmc.tv 2>&1 > /dev/null | grep "^Location:" | cut -f 2 -d ' ')
-export DOWNLOAD_URL
+if [ -z $DOWNLOAD_URL ]
+then
+	DOWNLOAD_URL=$(env LANG=C wget -S --spider --timeout 60 http://download.osmc.tv 2>&1 > /dev/null | grep "^Location:" | cut -f 2 -d ' ')
+	export DOWNLOAD_URL
+fi
 
 cores=$(if [ ! -f /proc/cpuinfo ]; then mount -t proc proc /proc; fi; cat /proc/cpuinfo | grep processor | wc -l && umount /proc/ >/dev/null 2>&1)
 export BUILD="make -j${cores}"
