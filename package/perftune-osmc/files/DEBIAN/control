@@ -1,8 +1,8 @@
 Origin: OSMC
 Package: perftune-osmc
-Version: 1.0.6
+Version: 1.0.7
 Section: main
-Essential: Yes
+Essential: No
 Priority: required
 Architecture: all
 Depends: systemd

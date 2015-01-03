@@ -4,7 +4,7 @@
 #!/bin/bash
 
 . ../common.sh
-test $1 == rbp && VERSION="3.17.4" && REV="4"
+test $1 == rbp && VERSION="3.17.4" && REV="5"
 if [ -z $VERSION ]; then echo "Don't have a defined kernel version for this target!" && exit 1; fi
 pull_source "https://www.kernel.org/pub/linux/kernel/v3.x/linux-${VERSION}.tar.xz" "$(pwd)/src/"
 if [ $? != 0 ]; then echo -e "Error downloading" && exit 1; fi
@@ -13,6 +13,7 @@ build_in_env "${1}" $(pwd) "kernel-osmc"
 if [ $? == 0 ]
 then
 	echo -e "Building Linux kernel"
+	if [ ! -f /tcver.${1} ]; then echo "Not in expected environment" && exit 1; fi
 	make clean
 	sed '/Package/d' -i files/DEBIAN/control
 	sed '/Depends/d' -i files/DEBIAN/control

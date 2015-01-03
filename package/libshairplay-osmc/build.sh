@@ -12,6 +12,7 @@ build_in_env "${1}" $(pwd) "libshairplay-osmc"
 if [ $? == 0 ]
 then
 	echo -e "Building libshairplay"
+	if [ ! -f /tcver.${1} ]; then echo "Not in expected environment" && exit 1; fi
 	out=$(pwd)/files
 	make clean
 	sed '/Package/d' -i files/DEBIAN/control
@@ -22,7 +23,7 @@ then
 	handle_dep "libtool"
 	test $1 == gen && echo "Package: libshairplay-osmc" >> files/DEBIAN/control && echo "Package: libshairplay-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: libshairplay-osmc" >> files-dev/DEBIAN/control
 	test $1 == rbp && echo "Package: rbp-libshairplay-osmc" >> files/DEBIAN/control && echo "Package: rbp-libshairplay-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: rbp-libshairplay-osmc" >> files-dev/DEBIAN/control
-test $1 == rbp && echo "Package: armv7-libshairplay-osmc" >> files/DEBIAN/control && echo "Package: armv7-libshairplay-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: armv7-libshairplay-osmc" >> files-dev/DEBIAN/control
+        test $1 == armv7 && echo "Package: armv7-libshairplay-osmc" >> files/DEBIAN/control && echo "Package: armv7-libshairplay-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: armv7-libshairplay-osmc" >> files-dev/DEBIAN/control
 	pushd src/shairplay*
 	install_patch "../../patches" "all"
 	./autogen.sh

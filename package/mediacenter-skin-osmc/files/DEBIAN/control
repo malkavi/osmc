@@ -1,0 +1,9 @@
+Origin: OSMC
+Package: mediacenter-skin-osmc
+Version: 1.02
+Section: tools
+Essential: No
+Priority: optional
+Architecture: armhf
+Maintainer: Sam G Nazarko <email@samnazarko.co.uk>
+Description: OSMC skin for mediacenter

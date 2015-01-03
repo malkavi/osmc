@@ -14,7 +14,9 @@ BootloaderConfig::BootloaderConfig(Target *device, Network *network, Utils *util
 
 void BootloaderConfig::copyBootFiles()
 {
+    system("mv /mnt/boot/preseed.cfg /tmp/preseed.cfg");
     system("rm -rf /mnt/boot/*"); /* Trash existing files */
+    system("mv /tmp/preseed.cfg /mnt/boot/preseed.cfg");
     system("mv /mnt/root/boot/* /mnt/boot");
 }
 
@@ -50,7 +52,7 @@ void BootloaderConfig::configureEnvironment()
         utils->writeToFile(cmdlineFile, cmdlineStringList, false);
         QFile configFile("/mnt/boot/config.txt");
         QStringList configStringList;
-        configStringList << "arm_freq=800\n" << "gpu_mem=128\n" << "hdmi_ignore_cec_init=1\n" << "disable_overscan=1\n" << "start_file=start_x.elf\n" << "fixup_file=fixup_x.dat";
+        configStringList << "arm_freq=850\n" << "core_freq=375\n" << "gpu_mem_256=112\n" << "gpu_mem_512=144\n" << "hdmi_ignore_cec_init=1\n" << "disable_overscan=1\n" << "start_file=start_x.elf\n" << "fixup_file=fixup_x.dat";
         utils->writeToFile(configFile, configStringList, false);
     }
 }

@@ -5,13 +5,14 @@
 
 . ../common.sh
 
-pull_source "https://github.com/sahlberg/libnfs/" "$(pwd)/src"
+pull_source "https://sites.google.com/site/libnfstarballs/li/libnfs-1.9.6.tar.gz" "$(pwd)/src"
 if [ $? != 0 ]; then echo -e "Error downloading" && exit 1; fi
 # Build in native environment
 build_in_env "${1}" $(pwd) "libnfs-osmc"
 if [ $? == 0 ]
 then
 	echo -e "Building libnfs"
+	if [ ! -f /tcver.${1} ]; then echo "Not in expected environment" && exit 1; fi
 	out=$(pwd)/files
 	if [ -d files/usr ]; then rm -rf files/usr; fi
 	if [ -d files-dev/usr ]; then rm -rf files-dev/usr; fi
@@ -23,9 +24,8 @@ then
 	handle_dep "libtool"
 	test "$1" == gen && echo "Package: libnfs-osmc" >> files/DEBIAN/control && echo "Package: libnfs-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: libnfs-osmc" >> files-dev/DEBIAN/control
 	test "$1" == rbp && echo "Package: rbp-libnfs-osmc" >> files/DEBIAN/control && echo "Package: rbp-libnfs-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: rbp-libnfs-osmc" >> files-dev/DEBIAN/control
-	test "$1" == rbp && echo "Package: armv7-libnfs-osmc" >> files/DEBIAN/control && echo "Package: armv7-libnfs-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: armv7-libnfs-osmc" >> files-dev/DEBIAN/control
-	pushd src
-	git checkout libnfs-1.9.5
+	test "$1" == armv7 && echo "Package: armv7-libnfs-osmc" >> files/DEBIAN/control && echo "Package: armv7-libnfs-dev-osmc" >> files-dev/DEBIAN/control && echo "Depends: armv7-libnfs-osmc" >> files-dev/DEBIAN/control
+	pushd src/libnfs-*
 	./bootstrap
 	./configure --prefix=/usr
 	$BUILD

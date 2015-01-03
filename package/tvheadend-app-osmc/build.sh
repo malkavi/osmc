@@ -5,13 +5,14 @@
 
 . ../common.sh
 
-pull_source "https://github.com/tvheadend/tvheadend" "$(pwd)/src"
+pull_source "https://github.com/tvheadend/tvheadend/archive/v3.9.tar.gz" "$(pwd)/src"
 if [ $? != 0 ]; then echo -e "Error downloading" && exit 1; fi
 # Build in native environment
 build_in_env "${1}" $(pwd) "tvheadend-app-osmc"
 if [ $? == 0 ]
 then
 	echo -e "Building TVHeadend"
+	if [ ! -f /tcver.${1} ]; then echo "Not in expected environment" && exit 1; fi
 	out=$(pwd)/files
 	sed '/Package/d' -i files/DEBIAN/control
 	update_sources
@@ -22,7 +23,6 @@ then
 	test $1 == rbp && echo "Package: rbp-tvheadend-app-osmc" >> files/DEBIAN/control
 	test $1 == armv7 && echo "Package: armv7-tvheadend-app-osmc" >> files/DEBIAN/control
 	pushd src
-	git checkout v3.9
 	./configure --prefix=/usr
 	$BUILD
 	make install DESTDIR=${out}

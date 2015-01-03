@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+	<!-- extendedprogressdialog -->
+	<zorder>2</zorder>
+
+	<controls>
+
+		<!-- Details -->
+		<control type="label" id="30">
+			<left>50</left>
+			<bottom>49</bottom>
+			<width>720</width>
+			<height>15</height>
+			<haspath>true</haspath>
+			<font>Font15Caps</font>
+			<textcolor>TextColorFO</textcolor>
+		</control>
+
+	</controls>
+
+</window>
